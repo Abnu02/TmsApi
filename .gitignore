@@ -47,6 +47,12 @@ project.fragment.lock.json
 artifacts/
 **/Properties/launchSettings.json
 
+# Local development settings
+appsettings.Development.json
+appsettings.Local.json
+.env
+.env.local
+
 # VS Code
 .vscode/
 
