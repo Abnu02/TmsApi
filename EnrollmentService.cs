@@ -1,11 +1,9 @@
 public interface IEnrollmentService
 {
     Task<EnrollmentRecord> EnrollmentAsync(string userId, string courseId);
-    Task<EnrollmentRecord?> GetByidAsync(string id);
+    Task<EnrollmentRecord?> GetByIdAsync(string id);
     Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync();
-
-
-
+    Task<bool> DeleteAsync(string id);
 }
 
 public class EnrollmentService : IEnrollmentService
@@ -16,19 +14,19 @@ public class EnrollmentService : IEnrollmentService
     {
         _logger = logger;
     }
-    public Task<EnrollmentRecord> EnrollmentAsync(string StudentId, string courseCode)
+    public Task<EnrollmentRecord> EnrollmentAsync(string studentId, string courseCode)
     {
-        var existing = _store.Values.FirstOrDefault(e => e.StudentId == StudentId && e.CourseCode == courseCode);
+        var existing = _store.Values.FirstOrDefault(e => e.StudentId == studentId && e.CourseCode == courseCode);
         if (existing is not null)
         {
-            _logger.LogWarning("Duplicate enrollment attempt {StudentId} already in {CourseCode} (record {EnrollmentI d})", StudentId, courseCode, existing.Id);
+            _logger.LogWarning("Duplicate enrollment attempt for {StudentId} in {CourseCode} (record {EnrollmentId})", studentId, courseCode, existing.Id);
             return Task.FromResult(existing);
         }
-        ;
+
         var id = Guid.NewGuid().ToString("N")[..8];
-        var record = new EnrollmentRecord(id, StudentId, courseCode, DateTime.UtcNow);
+        var record = new EnrollmentRecord(id, studentId, courseCode, DateTime.UtcNow);
         _store[id] = record;
-        _logger.LogInformation("Enrolled {StudentId} in {CourseCode} record {EnrollmentId}", StudentId, courseCode, id);
+        _logger.LogInformation("Enrolled {StudentId} in {CourseCode} record {EnrollmentId}", studentId, courseCode, id);
         return Task.FromResult(record);
     }
     public Task<EnrollmentRecord?> GetByIdAsync(string id)
@@ -44,6 +42,7 @@ public class EnrollmentService : IEnrollmentService
     public Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync()
     {
         IReadOnlyList<EnrollmentRecord> all = _store.Values.ToList();
+        _logger.LogInformation("Retrieved {Count} enrollment records", all.Count);
         return Task.FromResult(all);
     }
     public Task<bool> DeleteAsync(string id)
@@ -60,13 +59,12 @@ public class EnrollmentService : IEnrollmentService
         return Task.FromResult(removed);
     }
 
-    public Task<EnrollmentRecord?> GetByidAsync(string id)
-    {
-        throw new NotImplementedException();
-    }
+    
 }
 public record EnrollmentRecord(
 string Id,
 string StudentId,
 string CourseCode,
 DateTime EnrolledAt);
+
+public class TmsDatabaseExptions(string Message) : Exception(Message);

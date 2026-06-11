@@ -1,6 +1,17 @@
 @TmsApi_HostAddress = http://localhost:5287
 
 
-GET {{TmsApi_HostAddress}}/api/enrollments/worker-smoke
+# GET {{TmsApi_HostAddress}}/api/error
 
+# Accept: application/json
+
+
+POST {{TmsApi_HostAddress}}/api/enrollments
+Content-Type: application/json
 Accept: application/json
+
+{
+  "studentId": "S-001",
+  "courseCode": "CS-101"
+}
+
