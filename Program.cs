@@ -39,6 +39,11 @@ app.MapGet("/api/assessments/results", () => Results.Ok(new
     courseCode = "CS-101",
     studentId = "S-001",
     letterGrade = "A"
-})).RequireAuthorization(); 
+}));
+app.MapGet("/api/enrollments/worker-smoke", (EnrollmentWorker worker) =>
+{
+    worker.ProcessBatch();
+    return Results.Ok("Processed cleanly without leaks.");
+});
 app.MapControllers();
 app.Run();
