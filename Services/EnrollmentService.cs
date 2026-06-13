@@ -67,4 +67,4 @@ string StudentId,
 string CourseCode,
 DateTime EnrolledAt);
 
-public class TmsDatabaseExptions(string Message) : Exception(Message);
+public class TmsDatabaseException(string message) : Exception(message);

@@ -21,7 +21,7 @@ builder.Services.AddOptions<PaymentOptions>()
 // 1. REGISTER SERVICES
 builder.Services.AddControllers();
 builder.Services.AddSingleton<EnrollmentWorker>();
-builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
+builder.Services.AddSingleton<IEnrollmentService, EnrollmentService>();
 
 // Register our training scheme mock services
 builder.Services
@@ -31,7 +31,23 @@ builder.Services.AddAuthorization();
 builder.Services.AddProblemDetails();
 
 
+
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    Console.WriteLine("Running in Development environment. Detailed errors will be shown.");
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("TMS API - Development Workspace")
+               .WithTheme(ScalarTheme.Purple);
+    });
+}
+else
+{
+    app.UseExceptionHandler();
+}
 
 app.UseHttpsRedirection();
 

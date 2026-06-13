@@ -15,3 +15,11 @@ Accept: application/json
   "courseCode": "CS-101"
 }
 
+###
+DELETE {{TmsApi_HostAddress}}/api/enrollments/72e16303
+Accept: application/json
+
+
+###
+GET {{TmsApi_HostAddress}}/api/enrollments
+Accept: application/json
