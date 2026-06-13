@@ -22,6 +22,8 @@ builder.Services.AddOptions<PaymentOptions>()
 builder.Services.AddControllers();
 builder.Services.AddSingleton<EnrollmentWorker>();
 builder.Services.AddSingleton<IEnrollmentService, EnrollmentService>();
+builder.Services.AddSingleton<IStudentService, StudentService>();
+builder.Services.AddSingleton<ICourseService, CourseService>();
 
 // Register our training scheme mock services
 builder.Services
