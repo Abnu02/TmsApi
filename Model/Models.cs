@@ -7,6 +7,8 @@ public interface IGradable
 
 public class Course
 {
+    public string? Id { get; set; }
+
     public required string Code { get; set; }
     public required string Title
     {
