@@ -1,15 +1,17 @@
+using TmsApi.Entities;
+
 public interface IStudentService
 {
     Task<Student> CreateAsync(Student student);
-    Task<Student?> GetByIdAsync(string id);
+    Task<Student?> GetByIdAsync(int id);
     Task<IReadOnlyList<Student>> GetAllAsync();
-    Task<bool> UpdateAsync(string id, Student student);
-    Task<bool> DeleteAsync(string id);
+    Task<bool> UpdateAsync(int id, Student student);
+    Task<bool> DeleteAsync(int id);
 }
 
 public class StudentService : IStudentService
 {
-    private readonly Dictionary<string, Student> _store = new();
+    private readonly Dictionary<int, Student> _store = new();
     private readonly ILogger<StudentService> _logger;
 
     public StudentService(ILogger<StudentService> logger)
@@ -30,7 +32,7 @@ public class StudentService : IStudentService
         return Task.FromResult(student);
     }
 
-    public Task<Student?> GetByIdAsync(string id)
+    public Task<Student?> GetByIdAsync(int id)
     {
         _store.TryGetValue(id, out var student);
 
@@ -48,7 +50,7 @@ public class StudentService : IStudentService
         return Task.FromResult(all);
     }
 
-    public Task<bool> UpdateAsync(string id, Student student)
+    public Task<bool> UpdateAsync(int id, Student student)
     {
         if (!_store.ContainsKey(id))
         {
@@ -61,7 +63,7 @@ public class StudentService : IStudentService
         return Task.FromResult(true);
     }
 
-    public Task<bool> DeleteAsync(string id)
+    public Task<bool> DeleteAsync(int id)
     {
         var removed = _store.Remove(id);
         if (removed)
