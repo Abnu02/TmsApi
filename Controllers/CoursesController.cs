@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TmsApi.Entities;
 
 [ApiController]
 [Route("api/courses")]
@@ -39,8 +40,7 @@ public class CoursesController(ICourseService courseService) : ControllerBase
         {
             Code = code,
             Title = request.Title,
-            Capacity = request.Capacity,
-            EnrolledCount = request.EnrolledCount
+            Capacity = request.Capacity
         };
         
         var updated = await courseService.UpdateAsync(code, course);
@@ -56,4 +56,4 @@ public class CoursesController(ICourseService courseService) : ControllerBase
 }
 
 public record CreateCourseRequest(string Code, string Title, int Capacity);
-public record UpdateCourseRequest(string Title, int Capacity, int EnrolledCount);
+public record UpdateCourseRequest(string Title, int Capacity);
