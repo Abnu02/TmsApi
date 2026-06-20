@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
+using System.Threading;
 using TmsApi.Data;
 namespace TmsApi.Controllers;
 
@@ -27,6 +29,29 @@ public class TestController(TmsDbContext context) : ControllerBase
         return Ok(results);
     }
 
+    [HttpGet("students-page")]
+    public async Task<IActionResult> GetStudentsPage([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+    {
+        if (pageNumber < 1 || pageSize < 1)
+        {
+            return BadRequest("pageNumber and pageSize must be greater than zero.");
+        }
+
+        var offset = (pageNumber - 1) * pageSize;
+        var page = await context.Students
+            .OrderBy(s => s.Name)
+            .Skip(offset)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return Ok(new
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            Items = page
+        });
+    }
+
     [HttpGet("translation-fail")]
     public IActionResult TestTranslationFail()
     {
@@ -44,4 +69,35 @@ public class TestController(TmsDbContext context) : ControllerBase
             return BadRequest(new { Message = ex.Message });
         }
     }
+    [HttpGet("students")]
+    public async Task<IActionResult> GetAll(CancellationToken ct = default)
+    {
+        var students = await context.Students
+            .OrderBy(s => s.Name)
+            .ToListAsync(ct);
+        return Ok(students);
+    }
+    [HttpGet("student-page")]
+    public async Task<IActionResult> GetPage([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+    {
+        if (pageNumber < 1 || pageSize < 1)
+        {
+            return BadRequest("pageNumber and pageSize must be greater than zero.");
+        }
+
+        var pageItems = await context.Students
+            .OrderBy(s => s.Name)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return Ok(new
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            Items = pageItems
+        });
+    }
+    //create an end point to create a student using POST method and return the created student with 201 status code
+    
 }
