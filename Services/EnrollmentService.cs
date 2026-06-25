@@ -1,6 +1,10 @@
+using Microsoft.EntityFrameworkCore;
+using TmsApi.Data;
+using TmsApi.Entities;
+
 public interface IEnrollmentService
 {
-    Task<EnrollmentRecord> EnrollmentAsync(string userId, string courseId);
+    Task<EnrollmentRecord> EnrollmentAsync(string studentId, string courseCode);
     Task<EnrollmentRecord?> GetByIdAsync(string id);
     Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync();
     Task<bool> DeleteAsync(string id);
@@ -8,63 +12,115 @@ public interface IEnrollmentService
 
 public class EnrollmentService : IEnrollmentService
 {
-    private readonly Dictionary<string, EnrollmentRecord> _store = new();
+    private readonly TmsDbContext _db;
     private readonly ILogger<EnrollmentService> _logger;
-    public EnrollmentService(ILogger<EnrollmentService> logger)
+
+    public EnrollmentService(TmsDbContext db, ILogger<EnrollmentService> logger)
     {
+        _db = db;
         _logger = logger;
     }
-    public Task<EnrollmentRecord> EnrollmentAsync(string studentId, string courseCode)
+
+    public async Task<EnrollmentRecord> EnrollmentAsync(string studentId, string courseCode)
     {
-        var existing = _store.Values.FirstOrDefault(e => e.StudentId == studentId && e.CourseCode == courseCode);
+        var student = await _db.Students.FirstOrDefaultAsync(s => s.RegistrationNumber == studentId);
+        if (student is null)
+        {
+            throw new InvalidOperationException($"Student '{studentId}' not found.");
+        }
+
+        var course = await _db.Courses.FirstOrDefaultAsync(c => c.Code == courseCode);
+        if (course is null)
+        {
+            throw new InvalidOperationException($"Course '{courseCode}' not found.");
+        }
+
+        var existing = await _db.Enrollments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.StudentId == student.Id && e.CourseId == course.Id);
+
         if (existing is not null)
         {
-            _logger.LogWarning("Duplicate enrollment attempt for {StudentId} in {CourseCode} (record {EnrollmentId})", studentId, courseCode, existing.Id);
-            return Task.FromResult(existing);
+            var existingRecord = new EnrollmentRecord(existing.Id.ToString(), student.RegistrationNumber, course.Code, existing.EnrolledAt);
+            _logger.LogWarning("Duplicate enrollment attempt for {StudentId} in {CourseCode} (record {EnrollmentId})", studentId, courseCode, existingRecord.Id);
+            return existingRecord;
         }
 
-        var id = Guid.NewGuid().ToString("N")[..8];
-        var record = new EnrollmentRecord(id, studentId, courseCode, DateTime.UtcNow);
-        _store[id] = record;
-        _logger.LogInformation("Enrolled {StudentId} in {CourseCode} record {EnrollmentId}", studentId, courseCode, id);
-        return Task.FromResult(record);
-    }
-    public Task<EnrollmentRecord?> GetByIdAsync(string id)
-    {
-        _store.TryGetValue(id, out var record);
+        var enrollment = new Enrollment
+        {
+            StudentId = student.Id,
+            CourseId = course.Id,
+            EnrolledAt = DateTime.UtcNow
+        };
 
-        if (record is null)
+        await _db.Enrollments.AddAsync(enrollment);
+        await _db.SaveChangesAsync();
+
+        var record = new EnrollmentRecord(enrollment.Id.ToString(), student.RegistrationNumber, course.Code, enrollment.EnrolledAt);
+        _logger.LogInformation("Enrolled {StudentId} in {CourseCode} record {EnrollmentId}", studentId, courseCode, record.Id);
+        return record;
+    }
+
+    public async Task<EnrollmentRecord?> GetByIdAsync(string id)
+    {
+        if (!int.TryParse(id, out var numericId))
+        {
+            return null;
+        }
+
+        var enrollment = await _db.Enrollments
+            .AsNoTracking()
+            .Include(e => e.Student)
+            .Include(e => e.Course)
+            .FirstOrDefaultAsync(e => e.Id == numericId);
+
+        if (enrollment is null)
         {
             _logger.LogWarning("Enrollment record {EnrollmentId} not found", id);
+            return null;
         }
-        return Task.FromResult(record);
-    }
-    public Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync()
-    {
-        IReadOnlyList<EnrollmentRecord> all = _store.Values.ToList();
-        _logger.LogInformation("Retrieved {Count} enrollment records", all.Count);
-        return Task.FromResult(all);
-    }
-    public Task<bool> DeleteAsync(string id)
-    {
-        var removed = _store.Remove(id);
-        if (removed)
-        {
-            _logger.LogInformation("Deleted enrollment record {EnrollmentId}", id);
-        }
-        else
-        {
-            _logger.LogWarning("Delete failed enrollment {EnrollmentId} not found", id);
-        }
-        return Task.FromResult(removed);
+
+        return new EnrollmentRecord(enrollment.Id.ToString(), enrollment.Student.RegistrationNumber, enrollment.Course.Code, enrollment.EnrolledAt);
     }
 
-    
+    public async Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync()
+    {
+        var records = await _db.Enrollments
+            .AsNoTracking()
+            .Include(e => e.Student)
+            .Include(e => e.Course)
+            .Select(e => new EnrollmentRecord(e.Id.ToString(), e.Student.RegistrationNumber, e.Course.Code, e.EnrolledAt))
+            .ToListAsync();
+
+        _logger.LogInformation("Retrieved {Count} enrollment records", records.Count);
+        return records;
+    }
+
+    public async Task<bool> DeleteAsync(string id)
+    {
+        if (!int.TryParse(id, out var numericId))
+        {
+            return false;
+        }
+
+        var enrollment = await _db.Enrollments.FindAsync(numericId);
+        if (enrollment is null)
+        {
+            _logger.LogWarning("Delete failed enrollment {EnrollmentId} not found", id);
+            return false;
+        }
+
+        _db.Enrollments.Remove(enrollment);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Deleted enrollment record {EnrollmentId}", id);
+        return true;
+    }
 }
+
 public record EnrollmentRecord(
-string Id,
-string StudentId,
-string CourseCode,
-DateTime EnrolledAt);
+    string Id,
+    string StudentId,
+    string CourseCode,
+    DateTime EnrolledAt);
 
 public class TmsDatabaseException(string message) : Exception(message);
