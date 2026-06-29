@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using TmsApi.Data;
 using TmsApi.Entities;
 
 public interface IStudentService
@@ -11,69 +13,72 @@ public interface IStudentService
 
 public class StudentService : IStudentService
 {
-    private readonly Dictionary<int, Student> _store = new();
+    private readonly TmsDbContext _db;
     private readonly ILogger<StudentService> _logger;
 
-    public StudentService(ILogger<StudentService> logger)
+    public StudentService(TmsDbContext db, ILogger<StudentService> logger)
     {
+        _db = db;
         _logger = logger;
     }
 
-    public Task<Student> CreateAsync(Student student)
+    public async Task<Student> CreateAsync(Student student)
     {
-        if (_store.ContainsKey(student.Id))
-        {
-            _logger.LogWarning("Student with Id {StudentId} already exists", student.Id);
-            throw new InvalidOperationException($"Student with Id {student.Id} already exists");
-        }
+        await _db.Students.AddAsync(student);
+        await _db.SaveChangesAsync();
 
-        _store[student.Id] = student;
         _logger.LogInformation("Created student {StudentId} with name {StudentName}", student.Id, student.Name);
-        return Task.FromResult(student);
+        return student;
     }
 
-    public Task<Student?> GetByIdAsync(int id)
+    public async Task<Student?> GetByIdAsync(int id)
     {
-        _store.TryGetValue(id, out var student);
-
+        var student = await _db.Students.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id);
         if (student is null)
         {
             _logger.LogWarning("Student {StudentId} not found", id);
         }
-        return Task.FromResult(student);
+        return student;
     }
 
-    public Task<IReadOnlyList<Student>> GetAllAsync()
+    public async Task<IReadOnlyList<Student>> GetAllAsync()
     {
-        IReadOnlyList<Student> all = _store.Values.ToList();
+        var all = await _db.Students.AsNoTracking().ToListAsync();
         _logger.LogInformation("Retrieved {Count} student records", all.Count);
-        return Task.FromResult(all);
+        return all;
     }
 
-    public Task<bool> UpdateAsync(int id, Student student)
+    public async Task<bool> UpdateAsync(int id, Student student)
     {
-        if (!_store.ContainsKey(id))
+        var existing = await _db.Students.FindAsync(id);
+        if (existing is null)
         {
             _logger.LogWarning("Student {StudentId} not found for update", id);
-            return Task.FromResult(false);
+            return false;
         }
 
-        _store[id] = student;
+        existing.RegistrationNumber = student.RegistrationNumber;
+        existing.Name = student.Name;
+        existing.GPA = student.GPA;
+        existing.IsActive = student.IsActive;
+
+        await _db.SaveChangesAsync();
         _logger.LogInformation("Updated student {StudentId}", id);
-        return Task.FromResult(true);
+        return true;
     }
 
-    public Task<bool> DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id)
     {
-        var removed = _store.Remove(id);
-        if (removed)
-        {
-            _logger.LogInformation("Deleted student {StudentId}", id);
-        }
-        else
+        var existing = await _db.Students.FindAsync(id);
+        if (existing is null)
         {
             _logger.LogWarning("Delete failed: student {StudentId} not found", id);
+            return false;
         }
-        return Task.FromResult(removed);
+
+        _db.Students.Remove(existing);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Deleted student {StudentId}", id);
+        return true;
     }
 }

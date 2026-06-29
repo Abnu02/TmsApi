@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using TmsApi.Data;
 using TmsApi.Entities;
 
 public interface ICourseService
@@ -11,69 +13,77 @@ public interface ICourseService
 
 public class CourseService : ICourseService
 {
-    private readonly Dictionary<string, Course> _store = new();
+    private readonly TmsDbContext _db;
     private readonly ILogger<CourseService> _logger;
 
-    public CourseService(ILogger<CourseService> logger)
+    public CourseService(TmsDbContext db, ILogger<CourseService> logger)
     {
+        _db = db;
         _logger = logger;
     }
 
-    public Task<Course> CreateAsync(Course course)
+    public async Task<Course> CreateAsync(Course course)
     {
-        if (_store.ContainsKey(course.Code))
+        var existing = await _db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Code == course.Code);
+        if (existing is not null)
         {
             _logger.LogWarning("Course with code {CourseCode} already exists", course.Code);
             throw new InvalidOperationException($"Course with code {course.Code} already exists");
         }
 
-        _store[course.Code] = course;
+        await _db.Courses.AddAsync(course);
+        await _db.SaveChangesAsync();
+
         _logger.LogInformation("Created course {CourseCode} with title {CourseTitle}", course.Code, course.Title);
-        return Task.FromResult(course);
+        return course;
     }
 
-    public Task<Course?> GetByCodeAsync(string code)
+    public async Task<Course?> GetByCodeAsync(string code)
     {
-        _store.TryGetValue(code, out var course);
-
+        var course = await _db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Code == code);
         if (course is null)
         {
             _logger.LogWarning("Course {CourseCode} not found", code);
         }
-        return Task.FromResult(course);
+        return course;
     }
 
-    public Task<IReadOnlyList<Course>> GetAllAsync()
+    public async Task<IReadOnlyList<Course>> GetAllAsync()
     {
-        IReadOnlyList<Course> all = _store.Values.ToList();
+        var all = await _db.Courses.AsNoTracking().ToListAsync();
         _logger.LogInformation("Retrieved {Count} course records", all.Count);
-        return Task.FromResult(all);
+        return all;
     }
 
-    public Task<bool> UpdateAsync(string code, Course course)
+    public async Task<bool> UpdateAsync(string code, Course course)
     {
-        if (!_store.ContainsKey(code))
+        var existing = await _db.Courses.FirstOrDefaultAsync(c => c.Code == code);
+        if (existing is null)
         {
             _logger.LogWarning("Course {CourseCode} not found for update", code);
-            return Task.FromResult(false);
+            return false;
         }
 
-        _store[code] = course;
+        existing.Title = course.Title;
+        existing.Capacity = course.Capacity;
+
+        await _db.SaveChangesAsync();
         _logger.LogInformation("Updated course {CourseCode}", code);
-        return Task.FromResult(true);
+        return true;
     }
 
-    public Task<bool> DeleteAsync(string code)
+    public async Task<bool> DeleteAsync(string code)
     {
-        var removed = _store.Remove(code);
-        if (removed)
-        {
-            _logger.LogInformation("Deleted course {CourseCode}", code);
-        }
-        else
+        var existing = await _db.Courses.FirstOrDefaultAsync(c => c.Code == code);
+        if (existing is null)
         {
             _logger.LogWarning("Delete failed: course {CourseCode} not found", code);
+            return false;
         }
-        return Task.FromResult(removed);
+
+        _db.Courses.Remove(existing);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Deleted course {CourseCode}", code);
+        return true;
     }
 }

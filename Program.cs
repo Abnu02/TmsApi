@@ -24,10 +24,9 @@ builder.Services.AddOptions<PaymentOptions>()
 // 1. REGISTER SERVICES
 builder.Services.AddControllers();
 builder.Services.AddSingleton<EnrollmentWorker>();
-builder.Services.AddSingleton<IEnrollmentService, EnrollmentService>();
-builder.Services.AddSingleton<IStudentService, StudentService>();
-builder.Services.AddSingleton<ICourseService, CourseService>();
-builder.Services.AddDbContext<TmsDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase")));
+builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
+builder.Services.AddScoped<IStudentService, StudentService>();
+builder.Services.AddScoped<ICourseService, CourseService>();
 
 // Register our training scheme mock services
 builder.Services
@@ -39,8 +38,6 @@ builder.Services.AddProblemDetails();
 builder.Services.AddDbContext<TmsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase")).LogTo(Console.WriteLine, LogLevel.Information).EnableSensitiveDataLogging()
 );
-
-
 
 var app = builder.Build();
 
@@ -75,6 +72,20 @@ app.UseStatusCodePages();
 app.MapGet("/api/error", () =>
 {
     throw new InvalidOperationException("This is a test exception for error handling.");
+});
+app.MapGet("/debug/nplusone", async (TmsDbContext db, CancellationToken cancellationToken) =>
+{
+    var report = await db.Students
+.AsNoTracking()
+.Select(s => new
+{
+s.Name,
+EnrollmentCount = s.Enrollments.Count
+})
+.ToListAsync(cancellationToken);
+foreach (var r in report)
+Console.WriteLine($"{r.Name}: {r.EnrollmentCount} enrollments");
+    return Results.Ok("Done");
 });
 app.MapGet("/api/assessments/results", () => Results.Ok(new
 {
