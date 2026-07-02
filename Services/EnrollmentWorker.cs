@@ -18,7 +18,7 @@ public class EnrollmentWorker
         using var scope = _scopeFactory.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<IEnrollmentService>();
 
-        var record = svc.EnrollmentAsync("S-001", "CS-101").GetAwaiter().GetResult();
+        var record = svc.EnrollmentAsync("S-001", 101).GetAwaiter().GetResult();
 
         _logger.LogInformation("Processed enrollment batch record {EnrollmentId} for {StudentId}.", record.Id, record.StudentId);
     }

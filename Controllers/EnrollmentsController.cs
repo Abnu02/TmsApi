@@ -20,7 +20,7 @@ public class EnrollmentsController(IEnrollmentService enrollmentService) : Contr
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateEnrollmentRequest request)
     {
-        var record = await enrollmentService.EnrollmentAsync(request.StudentId, request.CourseCode);
+        var record = await enrollmentService.EnrollmentAsync(request.StudentId, int.Parse(request.CourseCode));
         return CreatedAtAction(nameof(GetById), new { id = record.Id }, record);
     }
     [HttpDelete("{id}")]

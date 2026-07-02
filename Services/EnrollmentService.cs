@@ -4,7 +4,7 @@ using TmsApi.Entities;
 
 public interface IEnrollmentService
 {
-    Task<EnrollmentRecord> EnrollmentAsync(string studentId, string courseCode);
+    Task<EnrollmentRecord> EnrollmentAsync(string studentId, int courseCode);
     Task<EnrollmentRecord?> GetByIdAsync(string id);
     Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync();
     Task<bool> DeleteAsync(string id);
@@ -21,7 +21,7 @@ public class EnrollmentService : IEnrollmentService
         _logger = logger;
     }
 
-    public async Task<EnrollmentRecord> EnrollmentAsync(string studentId, string courseCode)
+    public async Task<EnrollmentRecord> EnrollmentAsync(string studentId, int courseCode)
     {
         var student = await _db.Students.FirstOrDefaultAsync(s => s.RegistrationNumber == studentId);
         if (student is null)
@@ -41,7 +41,7 @@ public class EnrollmentService : IEnrollmentService
 
         if (existing is not null)
         {
-            var existingRecord = new EnrollmentRecord(existing.Id.ToString(), student.RegistrationNumber, course.Code, existing.EnrolledAt);
+            var existingRecord = new EnrollmentRecord(existing.Id.ToString(), student.RegistrationNumber, course.Code.ToString(), existing.EnrolledAt);
             _logger.LogWarning("Duplicate enrollment attempt for {StudentId} in {CourseCode} (record {EnrollmentId})", studentId, courseCode, existingRecord.Id);
             return existingRecord;
         }
@@ -56,7 +56,7 @@ public class EnrollmentService : IEnrollmentService
         await _db.Enrollments.AddAsync(enrollment);
         await _db.SaveChangesAsync();
 
-        var record = new EnrollmentRecord(enrollment.Id.ToString(), student.RegistrationNumber, course.Code, enrollment.EnrolledAt);
+        var record = new EnrollmentRecord(enrollment.Id.ToString(), student.RegistrationNumber, course.Code.ToString(), enrollment.EnrolledAt);
         _logger.LogInformation("Enrolled {StudentId} in {CourseCode} record {EnrollmentId}", studentId, courseCode, record.Id);
         return record;
     }
@@ -80,7 +80,7 @@ public class EnrollmentService : IEnrollmentService
             return null;
         }
 
-        return new EnrollmentRecord(enrollment.Id.ToString(), enrollment.Student.RegistrationNumber, enrollment.Course.Code, enrollment.EnrolledAt);
+        return new EnrollmentRecord(enrollment.Id.ToString(), enrollment.Student.RegistrationNumber, enrollment.Course.Code.ToString(), enrollment.EnrolledAt);
     }
 
     public async Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync()
@@ -89,7 +89,7 @@ public class EnrollmentService : IEnrollmentService
             .AsNoTracking()
             .Include(e => e.Student)
             .Include(e => e.Course)
-            .Select(e => new EnrollmentRecord(e.Id.ToString(), e.Student.RegistrationNumber, e.Course.Code, e.EnrolledAt))
+            .Select(e => new EnrollmentRecord(e.Id.ToString(), e.Student.RegistrationNumber, e.Course.Code.ToString(), e.EnrolledAt))
             .ToListAsync();
 
         _logger.LogInformation("Retrieved {Count} enrollment records", records.Count);
