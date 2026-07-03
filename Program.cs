@@ -121,7 +121,7 @@ using (var scope = app.Services.CreateScope())
         {
             new() { Code = 101, Title = "Introduction to Computer Science", MaxCapacity = 30 },
             new() { Code = 201, Title = "Data Structures and Algorithms", MaxCapacity = 25 },
-            new() { Code = 101, Title = "Calculus I", MaxCapacity = 40 }
+            new() { Code = 301, Title = "Calculus I", MaxCapacity = 40 }
         };
         context.Courses.AddRange(courses);
         context.SaveChanges();
