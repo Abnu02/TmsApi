@@ -80,12 +80,12 @@ app.MapGet("/debug/nplusone", async (TmsDbContext db, CancellationToken cancella
 .AsNoTracking()
 .Select(s => new
 {
-s.Name,
-EnrollmentCount = s.Enrollments.Count
+    s.Name,
+    EnrollmentCount = s.Enrollments.Count
 })
 .ToListAsync(cancellationToken);
-foreach (var r in report)
-Console.WriteLine($"{r.Name}: {r.EnrollmentCount} enrollments");
+    foreach (var r in report)
+        Console.WriteLine($"{r.Name}: {r.EnrollmentCount} enrollments");
     return Results.Ok("Done");
 });
 app.MapGet("/api/assessments/results", () => Results.Ok(new
@@ -119,9 +119,9 @@ using (var scope = app.Services.CreateScope())
         context.Students.AddRange(students);
         var courses = new List<Course>
         {
-            new() { Code = 101, Title = "Introduction to Computer Science", MaxCapacity = 30 },
-            new() { Code = 201, Title = "Data Structures and Algorithms", MaxCapacity = 25 },
-            new() { Code = 301, Title = "Calculus I", MaxCapacity = 40 }
+            new() { Code = "CS-101", Title = "Introduction to Computer Science", MaxCapacity = 30 },
+            new() { Code = "CS-201", Title = "Data Structures and Algorithms", MaxCapacity = 25 },
+            new() { Code = "CS-301", Title = "Calculus I", MaxCapacity = 40 }
         };
         context.Courses.AddRange(courses);
         context.SaveChanges();

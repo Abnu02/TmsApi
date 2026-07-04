@@ -1,12 +1,16 @@
 using TmsApi.Entities;
-
+using TmsApi.Dtos;
 namespace TmsApi.Services;
+
+
 
 public interface ICourseService
 {
-    Task<Course> CreateAsync(Course course, CancellationToken ct);
-    Task<Course?> GetByCodeAsync(int code, CancellationToken ct);
-    Task<IReadOnlyList<Course>> GetAllAsync(CancellationToken ct);
-    Task<bool> UpdateAsync(int code, Course course, CancellationToken ct);
-    Task<bool> DeleteAsync(int code, CancellationToken ct);
+
+    Task<CourseResponseDto> CreateAsync(CreateCourseRequest request, CancellationToken ct);
+    Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct);
+    // Task<IReadOnlyList<CourseResponseDto>> GetAllAsync(CancellationToken ct);
+    Task<bool> CodeExistsAsync(string code, CancellationToken ct);
+    Task<bool> UpdateAsync(int id, Course course, CancellationToken ct);
+    Task<bool> DeleteAsync(int id, CancellationToken ct);
 }
