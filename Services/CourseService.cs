@@ -1,89 +1,109 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TmsApi.Data;
+using TmsApi.Dtos;
 using TmsApi.Entities;
+using TmsApi.Services;
 
-public interface ICourseService
+
+public class CourseService(TmsDbContext db, ILogger<CourseService> logger) : ICourseService
 {
-    Task<Course> CreateAsync(Course course);
-    Task<Course?> GetByCodeAsync(string code);
-    Task<IReadOnlyList<Course>> GetAllAsync();
-    Task<bool> UpdateAsync(string code, Course course);
-    Task<bool> DeleteAsync(string code);
-}
-
-public class CourseService : ICourseService
-{
-    private readonly TmsDbContext _db;
-    private readonly ILogger<CourseService> _logger;
-
-    public CourseService(TmsDbContext db, ILogger<CourseService> logger)
+    public async Task<CourseResponseDto> CreateAsync(CreateCourseRequest request, CancellationToken ct)
     {
-        _db = db;
-        _logger = logger;
-    }
-
-    public async Task<Course> CreateAsync(Course course)
-    {
-        var existing = await _db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Code == course.Code);
-        if (existing is not null)
+        var course = new Course
         {
-            _logger.LogWarning("Course with code {CourseCode} already exists", course.Code);
-            throw new InvalidOperationException($"Course with code {course.Code} already exists");
-        }
+            Code = request.Code,
+            Title = request.Title,
+            MaxCapacity = request.MaxCapacity
+        };
 
-        await _db.Courses.AddAsync(course);
-        await _db.SaveChangesAsync();
+        db.Courses.Add(course);
+        await db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Created course {CourseCode} with title {CourseTitle}", course.Code, course.Title);
-        return course;
+        logger.LogInformation("Created course {CourseId} ({Code})", course.Id, course.Code);
+        return (await GetByIdAsync(course.Id, ct))!;
     }
+    public Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct) =>
+           db.Courses
+               .AsNoTracking()
+               .Where(c => c.Id == id)
+               .Select(c => new CourseResponseDto(
+                   c.Id,
+                   c.Code,
+                   c.Title,
+                   c.MaxCapacity,
+                   c.Enrollments.Count))
+               .FirstOrDefaultAsync(ct);
 
-    public async Task<Course?> GetByCodeAsync(string code)
-    {
-        var course = await _db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Code == code);
-        if (course is null)
-        {
-            _logger.LogWarning("Course {CourseCode} not found", code);
-        }
-        return course;
-    }
+    public Task<bool> CodeExistsAsync(string code, CancellationToken ct) => db.Courses.AsNoTracking().AnyAsync(c => c.Code == code, ct);
+    // public async Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct)
+    // {
+    //     var course = await db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
+    //     if (course is null)
+    //     {
+    //         logger.LogWarning("Course with id {CourseId} not found", id);
+    //         return null;
+    //     }
 
-    public async Task<IReadOnlyList<Course>> GetAllAsync()
-    {
-        var all = await _db.Courses.AsNoTracking().ToListAsync();
-        _logger.LogInformation("Retrieved {Count} course records", all.Count);
-        return all;
-    }
+    //     return MapToDto(course);
+    // }
 
-    public async Task<bool> UpdateAsync(string code, Course course)
+    // public async Task<CourseResponseDto?> GetByIdAsync(string code, CancellationToken ct)
+    // {
+    //     var course = await db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Code == code, ct);
+    //     if (course is null)
+    //     {
+    //         logger.LogWarning("Course with code {CourseCode} not found", code);
+    //         return null;
+    //     }
+    //     return course;
+    // }
+
+    // public async Task<IReadOnlyList<CourseResponseDto>> GetAllAsync(CancellationToken ct)
+    // {
+    //     var all = await db.Courses.AsNoTracking().ToListAsync(ct);
+    //     logger.LogInformation("Retrieved {Count} course records", all.Count);
+    //     return all.Select(MapToDto).ToList();
+    // }
+
+
+    public async Task<bool> UpdateAsync(int id, Course course, CancellationToken ct)
     {
-        var existing = await _db.Courses.FirstOrDefaultAsync(c => c.Code == code);
+        var existing = await db.Courses.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (existing is null)
         {
-            _logger.LogWarning("Course {CourseCode} not found for update", code);
+            logger.LogWarning("Course with id {CourseId} not found for update", id);
             return false;
         }
 
         existing.Title = course.Title;
-        existing.Capacity = course.Capacity;
+        existing.MaxCapacity = course.MaxCapacity;
 
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Updated course {CourseCode}", code);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Updated course with id {CourseId}", id);
         return true;
     }
 
-    public async Task<bool> DeleteAsync(string code)
+    public async Task<bool> DeleteAsync(int id, CancellationToken ct)
     {
-        var existing = await _db.Courses.FirstOrDefaultAsync(c => c.Code == code);
+        var existing = await db.Courses.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (existing is null)
         {
-            _logger.LogWarning("Delete failed: course {CourseCode} not found", code);
+            logger.LogWarning("Delete failed: course with id {CourseId} not found", id);
             return false;
         }
 
-        _db.Courses.Remove(existing);
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Deleted course {CourseCode}", code);
+        db.Courses.Remove(existing);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Deleted course with id {CourseId}", id);
         return true;
     }
+
+    //     private static CourseResponseDto MapToDto(Course course) => new(
+    //         course.Id,
+    //         course.Code,
+    //         course.Title,
+    //         course.MaxCapacity,
+    //         course.Enrollments.Count);
 }
+// }
