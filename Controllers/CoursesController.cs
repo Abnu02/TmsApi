@@ -14,6 +14,13 @@ public class CoursesController(ICourseService courseService) : ControllerBase
     //     return Ok(courses);
     // }
 
+    [HttpGet]
+    public async Task<IActionResult> GetCourses([FromQuery] PagedRequest request, CancellationToken ct)
+    {
+        var result = await courseService.GetCoursesAsync(request, ct);
+        return Ok(result);
+    }
+
     [HttpGet("{id:int}", Name = nameof(GetCourseById))]
     public async Task<IActionResult> GetCourseById(int id, CancellationToken ct)
     {
