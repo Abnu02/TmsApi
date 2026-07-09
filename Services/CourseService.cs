@@ -36,6 +36,51 @@ public class CourseService(TmsDbContext db, ILogger<CourseService> logger) : ICo
                .FirstOrDefaultAsync(ct);
 
     public Task<bool> CodeExistsAsync(string code, CancellationToken ct) => db.Courses.AsNoTracking().AnyAsync(c => c.Code == code, ct);
+
+    public async Task<PagedResponse<CourseResponseDto>> GetCoursesAsync(PagedRequest request, CancellationToken ct)
+    {
+        // TODO 1: Start with a no-tracking IQueryable<Course>:
+        IQueryable<Course> query = db.Courses.AsNoTracking();
+
+        // TODO 2: If request.Search has a value, append a Where clause:
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            query = query.Where(c => EF.Functions.ILike(c.Title, $"%{request.Search}%")
+                                     || EF.Functions.ILike(c.Code, $"%{request.Search}%"));
+        }
+
+        // TODO 3: Count BEFORE paging:
+        var totalCount = await query.CountAsync(ct);
+
+        // TODO 4: Apply OrderBy, then Skip/Take, then Select projection.
+        IOrderedQueryable<Course> sortedQuery = request.OrderBy switch
+        {
+            "Code" => request.Descending ? query.OrderByDescending(c => c.Code) : query.OrderBy(c => c.Code),
+            "MaxCapacity" => request.Descending ? query.OrderByDescending(c => c.MaxCapacity) : query.OrderBy(c => c.MaxCapacity),
+            _ => request.Descending ? query.OrderByDescending(c => c.Title) : query.OrderBy(c => c.Title)
+        };
+
+        // TODO 5: Materialise:
+        var items = await sortedQuery
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(c => new CourseResponseDto(
+                c.Id,
+                c.Code,
+                c.Title,
+                c.MaxCapacity,
+                c.Enrollments.Count))
+            .ToListAsync(ct);
+
+        // TODO 6: Return new PagedResponse<CourseResponseDto>
+        return new PagedResponse<CourseResponseDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = request.Page,
+            PageSize = request.PageSize
+        };
+    }
     // public async Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct)
     // {
     //     var course = await db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
