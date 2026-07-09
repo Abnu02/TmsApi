@@ -6,13 +6,25 @@ using TmsApi.Services;
 [Route("api/courses/{courseId:int}/enrollments")]
 public class EnrollmentsController(
     ICourseService courseService,
-    IEnrollmentService enrollmentService) : ControllerBase
+    IEnrollmentService enrollmentService,
+    IStudentService studentService) : ControllerBase
 {
     [HttpGet("{id:int}", Name = nameof(GetEnrollment))]
     public async Task<IActionResult> GetEnrollment(int courseId, int id, CancellationToken ct)
     {
         var enrollment = await enrollmentService.GetByIdAsync(courseId, id, ct);
         return enrollment is not null ? Ok(enrollment) : NotFound();
+    }
+
+    [HttpGet(Name = "ListCourseEnrollments")]
+    public async Task<IActionResult> GetEnrollments(int courseId, CancellationToken ct)
+    {
+        var course = await courseService.GetByIdAsync(courseId, ct);
+        if (course is null)
+            return NotFound();
+
+        var enrollments = await enrollmentService.GetByCourseAsync(courseId, ct);
+        return Ok(enrollments);
     }
 
     [HttpPost]
@@ -34,8 +46,20 @@ public class EnrollmentsController(
             });
         }
 
+        var student = await studentService.GetByIdAsync(request.StudentId);
+        if (student is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Student not found",
+                Detail = $"Student '{request.StudentId}' does not exist.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+
         var enrollment = await enrollmentService.CreateAsync(courseId, request, ct);
         return CreatedAtAction(nameof(GetEnrollment), new { courseId, id = enrollment.Id }, enrollment);
     }
+    
 }
 
