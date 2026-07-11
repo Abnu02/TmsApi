@@ -1,74 +1,58 @@
 using Microsoft.AspNetCore.Mvc;
-using TmsApi.Entities;
+using TmsApi.Dtos;
+using TmsApi.Services;
 
 [ApiController]
 [Route("api/students")]
 public class StudentsController(IStudentService studentService) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] PagedRequest request, CancellationToken ct)
     {
-        var students = await studentService.GetAllAsync();
+        var students = await studentService.GetAllAsync(request, ct);
         return Ok(students);
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(string id)
+    public async Task<IActionResult> GetById(string id, CancellationToken ct)
     {
         if (!int.TryParse(id, out var studentId))
         {
             return BadRequest("Invalid student ID");
         }
-        var student = await studentService.GetByIdAsync(studentId);
+
+        var student = await studentService.GetByIdAsync(studentId, ct);
         return student is not null ? Ok(student) : NotFound();
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateStudentRequest request)
+    public async Task<IActionResult> Create([FromBody] CreateStudentRequest request, CancellationToken ct)
     {
-        var student = new Student
-        {
-            RegistrationNumber = request.RegistrationNumber,
-            Name = request.Name,
-            GPA = request.GPA,
-            IsActive = request.IsActive
-        };
-        
-        var created = await studentService.CreateAsync(student);
+        var created = await studentService.CreateAsync(request, ct);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(string id, [FromBody] UpdateStudentRequest request)
+    public async Task<IActionResult> Update(string id, [FromBody] UpdateStudentRequest request, CancellationToken ct)
     {
         if (!int.TryParse(id, out var studentId))
         {
             return BadRequest("Invalid student ID");
         }
-        var student = new Student
-        {
-            Id = studentId,
-            RegistrationNumber = request.RegistrationNumber,
-            Name = request.Name,
-            GPA = request.GPA,
-            IsActive = request.IsActive
-        };
-        
-        var updated = await studentService.UpdateAsync(studentId, student);
+
+        var updated = await studentService.UpdateAsync(studentId, request, ct);
         return updated ? NoContent() : NotFound();
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id)
+    public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
         if (!int.TryParse(id, out var studentId))
         {
             return BadRequest("Invalid student ID");
         }
-        var deleted = await studentService.DeleteAsync(studentId);
+
+        var deleted = await studentService.DeleteAsync(studentId, ct);
         return deleted ? NoContent() : NotFound();
     }
 }
-
-public record CreateStudentRequest(string RegistrationNumber, string Name, decimal GPA, bool IsActive);
-public record UpdateStudentRequest(string RegistrationNumber, string Name, decimal GPA, bool IsActive);
