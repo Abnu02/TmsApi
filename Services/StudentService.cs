@@ -1,15 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Data;
+using TmsApi.Dtos;
 using TmsApi.Entities;
-
-public interface IStudentService
-{
-    Task<Student> CreateAsync(Student student);
-    Task<Student?> GetByIdAsync(int id);
-    Task<IReadOnlyList<Student>> GetAllAsync();
-    Task<bool> UpdateAsync(int id, Student student);
-    Task<bool> DeleteAsync(int id);
-}
+using TmsApi.Services;
 
 public class StudentService : IStudentService
 {
@@ -22,54 +15,83 @@ public class StudentService : IStudentService
         _logger = logger;
     }
 
-    public async Task<Student> CreateAsync(Student student)
+    public async Task<StudentResponseDto> CreateAsync(CreateStudentRequest request, CancellationToken ct)
     {
-        await _db.Students.AddAsync(student);
-        await _db.SaveChangesAsync();
+        var student = new Student
+        {
+            RegistrationNumber = request.RegistrationNumber,
+            Name = request.Name,
+            GPA = request.GPA,
+            IsActive = request.IsActive
+        };
+
+        _db.Students.Add(student);
+        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Created student {StudentId} with name {StudentName}", student.Id, student.Name);
-        return student;
+        return (await GetByIdAsync(student.Id, ct))!;
     }
 
-    public async Task<Student?> GetByIdAsync(int id)
+    public Task<StudentResponseDto?> GetByIdAsync(int id, CancellationToken ct) =>
+        _db.Students
+            .AsNoTracking()
+            .Where(s => s.Id == id)
+            .Select(s => new StudentResponseDto(
+                s.Id,
+                s.RegistrationNumber,
+                s.Name,
+                (double)s.GPA,
+                s.IsActive))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<PagedResponse<StudentResponseDto>> GetAllAsync(PagedRequest request, CancellationToken ct)
     {
-        var student = await _db.Students.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id);
-        if (student is null)
+        var query = _db.Students
+            .AsNoTracking()
+            .Select(s => new StudentResponseDto(
+                s.Id,
+                s.RegistrationNumber,
+                s.Name,
+                (double)s.GPA,
+                s.IsActive));
+
+        var totalCount = await query.CountAsync(ct);
+        var students = await query.Skip((request.Page - 1) * request.PageSize)
+                                  .Take(request.PageSize)
+                                  .ToListAsync(ct);
+
+        _logger.LogInformation("Retrieved {Count} student records", students.Count);
+        return new PagedResponse<StudentResponseDto>
         {
-            _logger.LogWarning("Student {StudentId} not found", id);
-        }
-        return student;
+            Items = students,
+            TotalCount = totalCount,
+            Page = request.Page,
+            PageSize = request.PageSize
+        };
     }
 
-    public async Task<IReadOnlyList<Student>> GetAllAsync()
+    public async Task<bool> UpdateAsync(int id, UpdateStudentRequest request, CancellationToken ct)
     {
-        var all = await _db.Students.AsNoTracking().ToListAsync();
-        _logger.LogInformation("Retrieved {Count} student records", all.Count);
-        return all;
-    }
-
-    public async Task<bool> UpdateAsync(int id, Student student)
-    {
-        var existing = await _db.Students.FindAsync(id);
+        var existing = await _db.Students.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (existing is null)
         {
             _logger.LogWarning("Student {StudentId} not found for update", id);
             return false;
         }
 
-        existing.RegistrationNumber = student.RegistrationNumber;
-        existing.Name = student.Name;
-        existing.GPA = student.GPA;
-        existing.IsActive = student.IsActive;
+        existing.RegistrationNumber = request.RegistrationNumber;
+        existing.Name = request.Name;
+        existing.GPA = request.GPA;
+        existing.IsActive = request.IsActive;
 
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Updated student {StudentId}", id);
         return true;
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id, CancellationToken ct)
     {
-        var existing = await _db.Students.FindAsync(id);
+        var existing = await _db.Students.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (existing is null)
         {
             _logger.LogWarning("Delete failed: student {StudentId} not found", id);
@@ -77,7 +99,7 @@ public class StudentService : IStudentService
         }
 
         _db.Students.Remove(existing);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Deleted student {StudentId}", id);
         return true;
     }
