@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using TmsApi.Middleware;
 using Scalar.AspNetCore;
+using Asp.Versioning;
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Data;
 using TmsApi.Entities;
@@ -11,7 +12,6 @@ using TmsApi.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
 builder.Host.UseDefaultServiceProvider(options =>
 {
     options.ValidateScopes = true;
@@ -28,6 +28,34 @@ builder.Services.AddControllers(options =>
 {
     options.Filters.Add<AuditLogFilter>();
 });
+
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.ShouldInclude = description =>
+        description.GroupName == "v1";
+});
+
+builder.Services.AddOpenApi("v2", options =>
+{
+    options.ShouldInclude = description =>
+        description.GroupName == "v2";
+});
+
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new HeaderApiVersionReader("X-Api-Version"));
+})
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
 builder.Services.AddSingleton<EnrollmentWorker>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
@@ -52,8 +80,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference(options =>
     {
-        options.WithTitle("TMS API - Development Workspace")
-               .WithTheme(ScalarTheme.Purple);
+        options.WithTitle("TMS API Reference")
+               .WithTheme(ScalarTheme.DeepSpace)
+               .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
+               .AddDocument("v1", "API Version 1.0")
+               .AddDocument("v2", "API Version 2.0");
     });
 }
 else
@@ -66,6 +97,8 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseMiddleware<RequestLoggingMiddleware>();
+
+app.UseMiddleware<V1DeprecationMiddleware>();
 
 app.UseAuthentication();
 
@@ -146,5 +179,5 @@ if (app.Environment.IsDevelopment())
     var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
     await DataSeeder.SeedAsync(context);
 }
-    
+
 app.Run();
