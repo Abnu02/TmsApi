@@ -1,13 +1,19 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using TmsApi.Services;
+using TmsApi.Dtos;
+using TmsApi.Entities;
 using TmsApi.Data;
 
-namespace TmsApi.Controllers.V1;
+
+
+namespace TmsApi.Controllers.V2;
 
 [ApiController]
 [Route("api/v{version:apiVersion}/courses")]
-[ApiVersion("1.0")]
+[ApiVersion("2.0")]
 public class CoursesController(TmsDbContext context) : ControllerBase
 {
     [HttpGet]
@@ -21,31 +27,47 @@ public class CoursesController(TmsDbContext context) : ControllerBase
 
         var baseQuery = context.Courses.AsNoTracking();
         var totalCount = await baseQuery.CountAsync(ct);
-        var items = await baseQuery
+        var rows = await baseQuery
             .OrderBy(c => c.Title)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(c => new
             {
                 c.Id,
-                c.Code,
                 c.Title,
+                c.Code,
                 c.MaxCapacity,
                 EnrollmentCount = c.Enrollments.Count
             })
             .ToListAsync(ct);
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+        var hasNext = page < totalPages;
+        var hasPrevious = page > 1;
 
         return Ok(new
         {
-            items,
-            totalCount,
-            page,
-            pageSize,
-            totalPages,
-            hasNext = page < totalPages,
-            hasPrevious = page > 1
+            data = rows,
+            meta = new
+            {
+                totalCount,
+                page,
+                pageSize,
+                totalPages,
+                hasNext,
+                hasPrevious
+            },
+            links = new
+            {
+                self = $"/api/v2/courses?page={page}&pageSize={pageSize}",
+                next = hasNext
+                    ? $"/api/v2/courses?page={page + 1}&pageSize={pageSize}"
+                    : (string?)null,
+                prev = hasPrevious
+                    ? $"/api/v2/courses?page={page - 1}&pageSize={pageSize}"
+                    : (string?)null,
+                enroll = "/api/v2/enrollments"
+            }
         });
     }
 }

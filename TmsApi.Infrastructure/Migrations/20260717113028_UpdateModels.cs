@@ -5,7 +5,7 @@
 namespace TmsApi.Migrations
 {
     /// <inheritdoc />
-    public partial class PendingModelChanges : Migration
+    public partial class UpdateModels : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
