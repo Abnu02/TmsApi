@@ -3,8 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
 using System.Threading;
-using TmsApi.Data;
-namespace TmsApi.Controllers;
+using TmsApi.Infrastructure.Persistence;
+
+namespace TmsApi.Api.Controllers;
 
 [ApiController]
 [Route("api/test")]
@@ -99,5 +100,5 @@ public class TestController(TmsDbContext context) : ControllerBase
         });
     }
     //create an end point to create a student using POST method and return the created student with 201 status code
-    
+
 }

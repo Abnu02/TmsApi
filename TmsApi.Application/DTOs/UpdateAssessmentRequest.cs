@@ -1,4 +1,4 @@
-namespace TmsApi.Dtos;
+namespace TmsApi.Application.DTOs;
 
 public record UpdateAssessmentRequest(
     string Title,

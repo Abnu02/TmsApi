@@ -1,5 +1,5 @@
 
-namespace TmsApi.Dtos;
+namespace TmsApi.Application.DTOs;
 
 public record EnrollmentResponseDto
 (

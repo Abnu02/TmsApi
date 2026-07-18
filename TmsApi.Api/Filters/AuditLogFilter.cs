@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Logging;
 
-namespace TmsApi.Filters;
+namespace TmsApi.Api.Filters;
 
 public class AuditLogFilter(ILogger<AuditLogFilter> logger) : IActionFilter
 {

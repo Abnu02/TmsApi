@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using TmsApi.Entities;
+using TmsApi.Domain.Entities;
 
-namespace TmsApi.Data.Configurations;
+namespace TmsApi.Infrastructure.Persistence.Configurations;
 
 public class CourseConfiguration : IEntityTypeConfiguration<Course>
 {
@@ -22,12 +22,12 @@ public class CourseConfiguration : IEntityTypeConfiguration<Course>
 
         builder.Property(c => c.MaxCapacity)
             .IsRequired();
-         builder.HasIndex(c => c.Code).IsUnique();
-        
+        builder.HasIndex(c => c.Code).IsUnique();
+
         builder.HasMany(c => c.Enrollments)
             .WithOne(e => e.Course)
             .HasForeignKey(e => e.CourseId)
-            .OnDelete(DeleteBehavior.Restrict); 
-       
+            .OnDelete(DeleteBehavior.Restrict);
+
     }
 }

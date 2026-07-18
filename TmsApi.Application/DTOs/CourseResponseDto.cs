@@ -1,4 +1,4 @@
-namespace TmsApi.Dtos
+namespace TmsApi.Application.DTOs
 {
     public record CourseResponseDto
  (
@@ -7,4 +7,5 @@ namespace TmsApi.Dtos
          string Title,
          int MaxCapacity,
          int EnrollmentCount
-);}
+);
+}

@@ -2,12 +2,9 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
-using TmsApi.Services;
-using TmsApi.Dtos;
-using TmsApi.Entities;
-using TmsApi.Data;
+using TmsApi.Infrastructure.Persistence;
 
-namespace TmsApi.Controllers.V1;
+namespace TmsApi.Api.Controllers.V1;
 
 [ApiController]
 [Route("api/v{version:apiVersion}/courses")]

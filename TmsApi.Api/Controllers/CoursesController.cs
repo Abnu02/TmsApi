@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using TmsApi.Entities;
 using Microsoft.AspNetCore.Routing;
-using TmsApi.Services;
-using TmsApi.Dtos;
+using TmsApi.Domain.Entities;
+using TmsApi.Application.Interfaces;
+using TmsApi.Application.DTOs;
 
-namespace TmsApi.Controllers;
+namespace TmsApi.Api.Controllers;
 
 [ApiController]
 [Route("api/courses")]

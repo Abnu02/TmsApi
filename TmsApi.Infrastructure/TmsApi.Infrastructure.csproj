@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TmsApi.Domain\TmsApi.Domain.csproj" />
+    <ProjectReference Include="..\TmsApi.Application\TmsApi.Application.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
