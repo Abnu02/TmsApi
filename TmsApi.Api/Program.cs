@@ -2,10 +2,15 @@ using Microsoft.AspNetCore.Authentication;
 using TmsApi.Middleware;
 using Scalar.AspNetCore;
 using Asp.Versioning;
+using FluentValidation;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Infrastructure.Persistence;
 using TmsApi.Domain.Entities;
+using TmsApi.Application.Behaviors;
+using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Interfaces;
+using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
 using TmsApi.Infrastructure.Services;
 
@@ -62,18 +67,27 @@ builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 
+builder.Services.AddMediatR(cfg =>
+    cfg.RegisterServicesFromAssembly(typeof(EnrollStudentHandler).Assembly));
+builder.Services.AddValidatorsFromAssembly(typeof(EnrollStudentValidator).Assembly);
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 // Register our training scheme mock services
 builder.Services
     .AddAuthentication("Training")
     .AddScheme<AuthenticationSchemeOptions, TrainingAuthHandler>("Training", null);
 builder.Services.AddAuthorization();
-builder.Services.AddProblemDetails();
 
 builder.Services.AddDbContext<TmsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase")).LogTo(Console.WriteLine, LogLevel.Information).EnableSensitiveDataLogging()
 );
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
@@ -105,7 +119,6 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-app.UseExceptionHandler();
 app.UseStatusCodePages();
 
 app.MapGet("/api/error", () =>
