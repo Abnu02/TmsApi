@@ -3,10 +3,11 @@ using TmsApi.Middleware;
 using Scalar.AspNetCore;
 using Asp.Versioning;
 using Microsoft.EntityFrameworkCore;
-using TmsApi.Data;
-using TmsApi.Entities;
-using TmsApi.Services;
-using TmsApi.Filters;
+using TmsApi.Infrastructure.Persistence;
+using TmsApi.Domain.Entities;
+using TmsApi.Application.Interfaces;
+using TmsApi.Api.Filters;
+using TmsApi.Infrastructure.Services;
 
 
 

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TmsApi.Data;
+using TmsApi.Infrastructure.Persistence;
 
-namespace TmsApi.Controllers;
+namespace TmsApi.Api.Controllers;
 
 [ApiController]
 [Route("api/reporting")]
@@ -23,9 +23,9 @@ public class ReportingController : ControllerBase
         var count = await _context.Students
             .Where(s => s.IsActive && s.GPA >= 3.0m)
             .CountAsync();
-        var list = await _context.Courses.Select(c=>new
+        var list = await _context.Courses.Select(c => new
         {
-            c.Title,         
+            c.Title,
             EnrollmentCount = _context.Enrollments.Count(e => e.CourseId == c.Id)
         }).OrderByDescending(x => x.EnrollmentCount).ToListAsync();
         return Ok(new { Count = count, List = list });

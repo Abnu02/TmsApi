@@ -1,6 +1,7 @@
-using TmsApi.Entities;
-using TmsApi.Dtos;
-namespace TmsApi.Services;
+using TmsApi.Domain.Entities;
+using TmsApi.Application.DTOs;
+
+namespace TmsApi.Application.Interfaces;
 
 
 

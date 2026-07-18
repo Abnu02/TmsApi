@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using TmsApi.Data;
-using TmsApi.Dtos;
-using TmsApi.Entities;
+using TmsApi.Application.DTOs;
+using TmsApi.Application.Interfaces;
+using TmsApi.Domain.Entities;
+using TmsApi.Infrastructure.Persistence;
 
-namespace TmsApi.Services;
+namespace TmsApi.Infrastructure.Services;
 
 public class EnrollmentService(TmsDbContext db, ILogger<EnrollmentService> logger) : IEnrollmentService
 {
