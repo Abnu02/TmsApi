@@ -3,6 +3,8 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Enrollments.Queries;
+
+namespace TmsApi.Api.Controllers.V2;
 [ApiController]
 [Route("api/v{version:apiVersion}/enrollments")]
 [ApiVersion("2.0")]
@@ -23,15 +25,14 @@ public class EnrollmentsController(IMediator mediator) : ControllerBase
             var status = error.Code switch
             {
                 "course_not_found" => StatusCodes.Status404NotFound,
-                "course_full" or "already_enrolled" => StatusCodes.
-        Status409Conflict,
+                "course_full" or "already_enrolled" => StatusCodes.Status409Conflict,
+                _ => StatusCodes.Status400BadRequest
             };
-            _ => StatusCodes.Status400BadRequest
-        return Problem(
-        statusCode: status,
-        title: "Enrollment rejected",
-        detail: error.Message,
-        type: $"https://tms.local/errors/{error.Code}");
+            return Problem(
+                statusCode: status,
+                title: "Enrollment rejected",
+                detail: error.Message,
+                type: $"https://tms.local/errors/{error.Code}");
         });
     }
     [HttpGet("{studentId}/schedule")]

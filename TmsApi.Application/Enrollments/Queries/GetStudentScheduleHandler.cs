@@ -8,13 +8,13 @@ public sealed class GetStudentScheduleHandler(IEnrollmentService enrollmentServi
 {
     public async Task<ScheduleDto> Handle(GetStudentScheduleQuery query, CancellationToken ct)
     {
-        var enrollments = await enrollmentService.GetByStudentAsync(query.StudentId, ct);
+        var enrollments = await enrollmentService.GetByStudentIdAsync(query.StudentId, ct);
 
         var courses = enrollments
             .Select(e => new ScheduleItemDto(
-                string.Empty,
-                string.Empty,
-                string.Empty))
+                e.Course.Code,
+                e.Course.Title,
+                "TBD"))
             .ToList();
 
         return new ScheduleDto(query.StudentId, courses);
