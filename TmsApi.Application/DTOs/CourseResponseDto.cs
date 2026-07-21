@@ -7,5 +7,4 @@ namespace TmsApi.Application.DTOs
          string Title,
          int MaxCapacity,
          int EnrollmentCount
-);
-}
+);}

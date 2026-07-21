@@ -49,4 +49,24 @@ public class EnrollmentService(TmsDbContext db, ILogger<EnrollmentService> logge
 
         return enrollments;
     }
+
+    public async Task<bool> ExistsAsync(int studentId, string courseCode, CancellationToken ct)
+    {
+        return await db.Enrollments
+            .AnyAsync(e => e.StudentId == studentId && e.Course.Code == courseCode, ct);
+    }
+
+    public async Task AddAsync(Enrollment enrollment, CancellationToken ct)
+    {
+        db.Enrollments.Add(enrollment);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Enrollment>> GetByStudentIdAsync(int studentId, CancellationToken ct)
+    {
+        return await db.Enrollments
+            .Include(e => e.Course)
+            .Where(e => e.StudentId == studentId)
+            .ToListAsync(ct);
+    }
 }
