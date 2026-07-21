@@ -13,10 +13,28 @@ using TmsApi.Application.Interfaces;
 using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
 using TmsApi.Infrastructure.Services;
+using Microsoft.Extensions.Caching.Hybrid;
 
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Production-only leave commented in lab
+// builder.Services.AddStackExchangeRedisCache(options =>
+// {
+//     options.Configuration = builder.Configuration.GetConnectionString("Redis");
+//     options.InstanceName = "tms:";
+// });
+// builder.Services.AddHybridCache();
+
+builder.Services.AddHybridCache(options =>
+{
+    options.DefaultEntryOptions = new HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromMinutes(10),
+        LocalCacheExpiration = TimeSpan.FromMinutes(2)
+    };
+});
 
 builder.Host.UseDefaultServiceProvider(options =>
 {
