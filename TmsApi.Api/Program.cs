@@ -14,6 +14,9 @@ using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
 using TmsApi.Infrastructure.Services;
 using Microsoft.Extensions.Caching.Hybrid;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using TmsApi.Api.RateLimiting;
 
 
 
@@ -93,6 +96,91 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavi
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks();
+
+// Rate Limiting: Tier-aware token bucket (global) + concurrency limiter for transcripts
+builder.Services.AddRateLimiter(options =>
+{
+    // Global partitioned limiter - every caller gets its own bucket based on API key + tier
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var (partitionKey, tier) = ApiKeyResolver.Resolve(httpContext);
+
+        return tier switch
+        {
+            ApiKeyTier.Paid => RateLimitPartition.GetTokenBucketLimiter(
+                partitionKey: $"paid:{partitionKey}",
+                factory: _ => new TokenBucketRateLimiterOptions
+                {
+                    TokenLimit = 200,
+                    TokensPerPeriod = 100,
+                    ReplenishmentPeriod = TimeSpan.FromSeconds(10),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }),
+
+            ApiKeyTier.Free => RateLimitPartition.GetTokenBucketLimiter(
+                partitionKey: $"free:{partitionKey}",
+                factory: _ => new TokenBucketRateLimiterOptions
+                {
+                    TokenLimit = 30,
+                    TokensPerPeriod = 10,
+                    ReplenishmentPeriod = TimeSpan.FromSeconds(10),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }),
+
+            _ => RateLimitPartition.GetTokenBucketLimiter(
+                partitionKey: $"anon:{partitionKey}",
+                factory: _ => new TokenBucketRateLimiterOptions
+                {
+                    TokenLimit = 10,
+                    TokensPerPeriod = 5,
+                    ReplenishmentPeriod = TimeSpan.FromSeconds(10),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                })
+        };
+    });
+
+    // Named concurrency limiter for the expensive transcript endpoint
+    // Limits simultaneous in-flight requests regardless of request rate
+    options.AddConcurrencyLimiter("transcripts", opt =>
+    {
+        opt.PermitLimit = 5;               // 5 in-flight transcripts maximum
+        opt.QueueLimit = 20;               // queue up to 20 more
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+
+    // Named token bucket for the expensive fuzzy-search endpoint
+    options.AddTokenBucketLimiter("search", opt =>
+    {
+        opt.TokenLimit = 10;
+        opt.TokensPerPeriod = 5;
+        opt.ReplenishmentPeriod = TimeSpan.FromSeconds(10);
+        opt.QueueLimit = 2;
+    });
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Return Retry-After derived from lease metadata (not a hard-coded constant)
+    options.OnRejected = async (context, ct) =>
+    {
+        var retryAfter = "10";
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var ts))
+            retryAfter = ((int)ts.TotalSeconds).ToString();
+
+        context.HttpContext.Response.Headers.RetryAfter = retryAfter;
+        context.HttpContext.Response.ContentType = "application/problem+json";
+        await context.HttpContext.Response.WriteAsJsonAsync(new Microsoft.AspNetCore.Mvc.ProblemDetails
+        {
+            Title = "Rate limit exceeded",
+            Detail = $"Too many requests. Retry after {retryAfter} seconds.",
+            Status = StatusCodes.Status429TooManyRequests,
+            Type = "https://tms.local/errors/rate_limit_exceeded"
+        }, ct);
+    };
+});
 
 // Register our training scheme mock services
 builder.Services
@@ -129,6 +217,9 @@ else
 app.UseHttpsRedirection();
 
 app.UseRouting();
+
+// Rate limiting must come after UseRouting and before MapControllers
+app.UseRateLimiter();
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 
@@ -170,6 +261,11 @@ app.MapGet("/api/assessments/results", () => Results.Ok(new
 //     return Results.Ok("Processed cleanly without leaks.");
 // });
 app.MapControllers();
+
+// Health checks must NOT be rate-limited — load balancers poll these every few seconds
+// and rate limiting them causes the service to be marked unhealthy under load
+app.MapHealthChecks("/health/live").DisableRateLimiting();
+app.MapHealthChecks("/health/ready").DisableRateLimiting();
 
 // Seed test data at startup
 using (var scope = app.Services.CreateScope())
