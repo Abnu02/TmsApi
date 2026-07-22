@@ -23,6 +23,12 @@ public class CourseService(TmsDbContext db, ILogger<CourseService> logger) : ICo
         logger.LogInformation("Created course {CourseId} ({Code})", course.Id, course.Code);
         return (await GetByIdAsync(course.Id, ct))!;
     }
+    
+    public async Task<List<Course>> GetAllAsync(CancellationToken ct)
+    {
+        return await db.Courses.Include(c => c.Enrollments).AsNoTracking().ToListAsync(ct);
+    }
+
     public Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct) =>
            db.Courses
                .AsNoTracking()

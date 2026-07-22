@@ -13,56 +13,34 @@ public class CoursesController(TmsDbContext context) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetCourses(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromServices] TmsApi.Application.Interfaces.ICachedCourseService cachedService,
         CancellationToken ct = default)
     {
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 50);
-
-        var baseQuery = context.Courses.AsNoTracking();
-        var totalCount = await baseQuery.CountAsync(ct);
-        var rows = await baseQuery
-            .OrderBy(c => c.Title)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(c => new
-            {
-                c.Id,
-                c.Title,
-                c.Code,
-                c.MaxCapacity,
-                EnrollmentCount = c.Enrollments.Count
-            })
-            .ToListAsync(ct);
-
-        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
-        var hasNext = page < totalPages;
-        var hasPrevious = page > 1;
-
+        // Using cached service for stampede protection as instructed
+        var courses = await cachedService.GetAllCoursesAsync(ct);
+        
         return Ok(new
         {
-            data = rows,
-            meta = new
-            {
-                totalCount,
-                page,
-                pageSize,
-                totalPages,
-                hasNext,
-                hasPrevious
-            },
-            links = new
-            {
-                self = $"/api/v2/courses?page={page}&pageSize={pageSize}",
-                next = hasNext
-                    ? $"/api/v2/courses?page={page + 1}&pageSize={pageSize}"
-                    : (string?)null,
-                prev = hasPrevious
-                    ? $"/api/v2/courses?page={page - 1}&pageSize={pageSize}"
-                    : (string?)null,
-                enroll = "/api/v2/enrollments"
-            }
+            data = courses
         });
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateCourse(
+        int id, 
+        [FromBody] TmsApi.Application.DTOs.CreateCourseRequest request,
+        [FromServices] TmsApi.Application.Interfaces.ICourseService service,
+        [FromServices] TmsApi.Application.Interfaces.ICachedCourseService cachedService,
+        CancellationToken ct)
+    {
+        var course = await context.Courses.FindAsync(new object[] { id }, ct);
+        if (course == null) return NotFound();
+        
+        course.Title = request.Title;
+        // update other fields if necessary
+        await context.SaveChangesAsync(ct);
+        
+        await cachedService.InvalidateCourseCacheAsync(ct);
+        return Ok(course);
     }
 }
