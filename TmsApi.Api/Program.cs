@@ -28,8 +28,22 @@ builder.Services.AddOptions<PaymentOptions>()
     .BindConfiguration("Payments")
     .ValidateDataAnnotations()
     .ValidateOnStart();
-
+// Production-only leave commented in lab
+// builder.Services.AddStackExchangeRedisCache(options =>
+// {
+//     options.Configuration = builder.Configuration.GetConnectionString("Redis");
+//     options.InstanceName = "tms:";
+// });
+// builder.Services.AddHybridCache();
 // 1. REGISTER SERVICES
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngular", policy =>
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
+
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<AuditLogFilter>();
@@ -108,6 +122,8 @@ else
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("AllowAngular");
 
 app.UseRouting();
 
