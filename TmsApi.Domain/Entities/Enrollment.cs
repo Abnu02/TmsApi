@@ -7,6 +7,7 @@ public class Enrollment
     public int CourseId { get; set; }
     public decimal? Grade { get; set; }
     public int Year { get; set; }
+    public string Status { get; set; } = "Pending";
     public DateTime EnrolledAt { get; set; } = DateTime.UtcNow;
     public Student Student { get; set; } = null!;
     public Course Course { get; set; } = null!;
