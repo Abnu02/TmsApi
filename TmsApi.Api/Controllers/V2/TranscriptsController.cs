@@ -1,26 +1,85 @@
+using System.Threading.Channels;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using TmsApi.Application.Transcripts;
+using TmsApi.Infrastructure.Transcripts;
 
 namespace TmsApi.Api.Controllers.V2;
 
 [ApiController]
-[Route("api/v{version:apiVersion}/transcripts")]
+[Route("api/v2/transcripts")]
 [ApiVersion("2.0")]
-public class TranscriptsController : ControllerBase
+public class TranscriptsController(
+    Channel<TranscriptRequest> channel,
+    ITranscriptStatusStore statusStore)
+    : ControllerBase
 {
-    /// <summary>
-    /// Request a student transcript (stub — Exercise 5 upgrades this to a 202 Accepted + Location header pattern).
-    /// The [EnableRateLimiting("transcripts")] attribute applies the named concurrency limiter ON TOP
-    /// of the global tier-aware token bucket, giving two independent guards:
-    ///   1. Token bucket: how many times per 10 s the caller can request.
-    ///   2. Concurrency limiter: how many transcript jobs can run simultaneously (max 5; queue 20; 429 for the rest).
-    /// </summary>
     [HttpPost]
     [EnableRateLimiting("transcripts")]
-    public IActionResult RequestTranscript([FromBody] object? _)
+    public async Task<IActionResult> RequestTranscript(
+        TranscriptRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
-        // Stub: Exercise 5 swaps this for enqueue + 202 + Location.
-        return Ok(new { message = "Transcript request received." });
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var existing =
+                await statusStore.GetReportIdForIdempotencyKeyAsync(
+                    idempotencyKey,
+                    ct);
+
+            if (existing is not null)
+            {
+                var existingStatus =
+                    await statusStore.GetAsync(existing, ct);
+
+                return Accepted(
+                    Url.Action(nameof(GetStatus), new { id = existing }),
+                    existingStatus);
+            }
+        }
+
+        var reportId = Guid.NewGuid().ToString("N")[..12];
+
+        var status = await statusStore.CreateAsync(
+            reportId,
+            request.StudentId,
+            ct);
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await statusStore.LinkIdempotencyKeyAsync(
+                idempotencyKey,
+                reportId,
+                ct);
+        }
+
+        await channel.Writer.WriteAsync(
+            request.WithReportId(reportId),
+            ct);
+
+        Response.Headers.RetryAfter = "5";
+
+        return Accepted(
+            Url.Action(nameof(GetStatus), new { id = reportId }),
+            status);
+    }
+
+    [HttpGet("{id}/status")]
+    public async Task<IActionResult> GetStatus(
+        string id,
+        CancellationToken ct)
+    {
+        var status = await statusStore.GetAsync(id, ct);
+
+        return status is null
+            ? NotFound(new ProblemDetails
+            {
+                Title = "Transcript not found",
+                Detail = $"No transcript request with id '{id}'.",
+                Status = StatusCodes.Status404NotFound
+            })
+            : Ok(status);
     }
 }

@@ -1,4 +1,11 @@
 using Microsoft.AspNetCore.Authentication;
+using System.Threading.Channels;
+using TmsApi.Application.Transcripts;
+using TmsApi.Infrastructure.Transcripts;
+using TmsApi.Infrastructure.Workers;
+using TmsApi.Api.Hubs;
+using TmsApi.Application.Notifications;
+using TmsApi.Api.Notifications;
 using TmsApi.Middleware;
 using Scalar.AspNetCore;
 using Asp.Versioning;
@@ -99,6 +106,17 @@ builder.Services.AddDbContext<TmsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase")).LogTo(Console.WriteLine, LogLevel.Information).EnableSensitiveDataLogging()
 );
 
+// Session 3: transcripts background processing + SignalR
+builder.Services.AddSignalR();
+builder.Services.AddSingleton(Channel.CreateBounded<TranscriptRequest>(
+    new BoundedChannelOptions(100)
+    {
+        FullMode = BoundedChannelFullMode.Wait
+    }));
+builder.Services.AddSingleton<ITranscriptStatusStore, InMemoryTranscriptStatusStore>();
+builder.Services.AddHostedService<TranscriptWorker>();
+builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptNotificationService>();
+
 var app = builder.Build();
 
 app.UseExceptionHandler();
@@ -167,6 +185,7 @@ app.MapGet("/api/assessments/results", () => Results.Ok(new
 //     return Results.Ok("Processed cleanly without leaks.");
 // });
 app.MapControllers();
+app.MapHub<TmsHub>("/hubs/tms");
 
 // Seed test data at startup
 using (var scope = app.Services.CreateScope())
