@@ -56,6 +56,8 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<AuditLogFilter>();
 });
 
+builder.Services.AddSignalR();
+
 builder.Services.AddOpenApi("v1", options =>
 {
     options.ShouldInclude = description =>
