@@ -3,12 +3,15 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Enrollments.Queries;
+using Microsoft.AspNetCore.SignalR;
+using TmsApi.Api.Hubs;
+using TmsApi.Application.Hubs;
 
 namespace TmsApi.Api.Controllers.V2;
 [ApiController]
 [Route("api/v{version:apiVersion}/enrollments")]
 [ApiVersion("2.0")]
-public class EnrollmentsController(IMediator mediator) : ControllerBase
+public class EnrollmentsController(IMediator mediator, IHubContext<TmsHub, ITmsHubClient> hubContext) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Enroll(
@@ -42,5 +45,14 @@ public class EnrollmentsController(IMediator mediator) : ControllerBase
         var schedule = await mediator.Send(
         new GetStudentScheduleQuery(studentId), ct);
         return Ok(schedule);
+    }
+
+    [HttpPost("{id}/approve")]
+    public async Task<IActionResult> Approve(string id, CancellationToken ct)
+    {
+        // For the sake of the lab, we just simulate the database commit succeeding
+        // and broadcast the event to all connected clients.
+        await hubContext.Clients.All.ReceiveEnrollmentStatusUpdated(id, "Approved");
+        return NoContent();
     }
 }
