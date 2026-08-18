@@ -16,19 +16,25 @@ EnrollStudentCommand command, CancellationToken ct)
 var course = await courseService.GetByCodeAsync(command.CourseCode, ct);
 if (course is null)
 return Result<EnrollmentCreated, EnrollmentError>.Failure(EnrollmentError.CourseNotFound(command.CourseCode));
-if (course.Enrollments.Count >= course.MaxCapacity)
-return Result<EnrollmentCreated, EnrollmentError>.Failure(
-EnrollmentError.CourseFull(course.Title, course.MaxCapacity));
+
+// Check if student is already enrolled BEFORE checking capacity
 if (await enrollmentService.ExistsAsync(command.StudentId, command.CourseCode, ct))
 return Result<EnrollmentCreated, EnrollmentError>.Failure(
 EnrollmentError.AlreadyEnrolled(command.StudentId, command.CourseCode));
+
+// Check capacity using fresh database count to prevent race conditions
+var currentEnrollmentCount = await enrollmentService.GetEnrollmentCountByCourseAsync(course.Id, ct);
+if (currentEnrollmentCount >= course.MaxCapacity)
+return Result<EnrollmentCreated, EnrollmentError>.Failure(
+EnrollmentError.CourseFull(course.Title, course.MaxCapacity));
+
 var enrollment = new Enrollment
 {
     StudentId = command.StudentId,
     CourseId = course.Id,
     EnrolledAt = DateTime.UtcNow
 };
-    await enrollmentService.AddAsync(enrollment, ct);
+await enrollmentService.AddAsync(enrollment, ct);
 return Result<EnrollmentCreated, EnrollmentError>.Success(
 new EnrollmentCreated(enrollment.Id, enrollment.StudentId,
 course.Code));

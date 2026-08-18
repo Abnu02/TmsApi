@@ -61,6 +61,21 @@ public class FlatEnrollmentsController(TmsDbContext dbContext) : ControllerBase
         if (course == null)
             return BadRequest(new { Message = $"Course '{payload.CourseId}' not found." });
 
+        // Check if student is already enrolled
+        var alreadyEnrolled = await dbContext.Enrollments.AnyAsync(
+            e => e.StudentId == student.Id && e.CourseId == course.Id, ct);
+        
+        if (alreadyEnrolled)
+            return Conflict(new { Message = $"Student '{student.Name}' is already enrolled in '{course.Title}'." });
+
+        // Check if course is at capacity
+        var currentEnrollmentCount = await dbContext.Enrollments
+            .Where(e => e.CourseId == course.Id)
+            .CountAsync(ct);
+        
+        if (currentEnrollmentCount >= course.MaxCapacity)
+            return Conflict(new { Message = $"Course '{course.Title}' has reached its maximum capacity of {course.MaxCapacity}." });
+
         var enrollment = new Enrollment
         {
             StudentId = student.Id,

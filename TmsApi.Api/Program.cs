@@ -40,6 +40,8 @@ builder.Services.AddOptions<PaymentOptions>()
     .BindConfiguration("Payments")
     .ValidateDataAnnotations()
     .ValidateOnStart();
+
+builder.Services.AddProblemDetails();
 // Production-only leave commented in lab
 // builder.Services.AddStackExchangeRedisCache(options =>
 // {
@@ -134,6 +136,8 @@ builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptN
 
 var app = builder.Build();
 
+app.UseStatusCodePages();
+
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
@@ -216,7 +220,7 @@ app.MapGet("/api/assessments/results", () => Results.Ok(new
 //     return Results.Ok("Processed cleanly without leaks.");
 // });
 app.MapControllers();
-app.MapHub<TmsHub>("/hubs/tms");
+app.MapHub<TmsHub>("/hubs/tms").RequireCors("TmsClient");
 
 // Seed test data at startup
 using (var scope = app.Services.CreateScope())
