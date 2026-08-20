@@ -69,4 +69,11 @@ public class EnrollmentService(TmsDbContext db, ILogger<EnrollmentService> logge
             .Where(e => e.StudentId == studentId)
             .ToListAsync(ct);
     }
+
+    public async Task<int> GetEnrollmentCountByCourseAsync(int courseId, CancellationToken ct)
+    {
+        return await db.Enrollments
+            .Where(e => e.CourseId == courseId)
+            .CountAsync(ct);
+    }
 }

@@ -11,4 +11,5 @@ public interface IEnrollmentService
     Task<bool> ExistsAsync(int studentId, string courseCode, CancellationToken ct);
     Task AddAsync(Enrollment enrollment, CancellationToken ct);
     Task<IReadOnlyList<Enrollment>> GetByStudentIdAsync(int studentId, CancellationToken ct);
+    Task<int> GetEnrollmentCountByCourseAsync(int courseId, CancellationToken ct);
 }
