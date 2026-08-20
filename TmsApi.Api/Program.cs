@@ -21,9 +21,27 @@ using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
 using TmsApi.Infrastructure.Services;
 using Microsoft.AspNetCore.Antiforgery;
-
+using Microsoft.AspNetCore.Identity;
+using TmsApi.Infrastructure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddIdentityCore<TmsUser>(options =>
+    {
+        // Enterprise Password Policy
+        options.Password.RequiredLength = 12;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireDigit = true;
+        options.Password.RequireNonAlphanumeric = true;
+
+        // Brute-Force Lockout Protection
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
+    })
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<TmsDbContext>();
 
 
 builder.Services.AddAntiforgery(options =>
