@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using TmsApi.Infrastructure.Persistence;
+using TmsApi.Infrastructure.Services;
 
 namespace TmsApi.Api.Controllers;
 
@@ -99,6 +100,31 @@ public class TestController(TmsDbContext context) : ControllerBase
             Items = pageItems
         });
     }
+
+    [HttpGet("crypto")]
+    public IActionResult TestCrypto()
+    {
+        var service = new CryptoDemoService();
+        const string plainText = "Password123!";
+        var hash1 = service.HashPassword(plainText);
+        var hash2 = service.HashPassword(plainText);
+
+        var match1 = service.VerifyPassword(plainText, hash1);
+        var match2 = service.VerifyPassword(plainText, hash2);
+
+        Console.WriteLine($"Hash 1: {hash1}");
+        Console.WriteLine($"Hash 2: {hash2}");
+
+        return Ok(new
+        {
+            Hash1 = hash1,
+            Hash2 = hash2,
+            HashesAreDifferent = hash1 != hash2,
+            Match1 = match1,
+            Match2 = match2
+        });
+    }
+
     //create an end point to create a student using POST method and return the created student with 201 status code
 
 }
