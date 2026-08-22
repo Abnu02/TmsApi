@@ -23,6 +23,9 @@ using TmsApi.Infrastructure.Services;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using TmsApi.Infrastructure.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -122,7 +125,7 @@ builder.Services.AddSingleton<EnrollmentWorker>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
-
+builder.Services.AddScoped<TokenService>();
 builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(EnrollStudentHandler).Assembly));
 builder.Services.AddValidatorsFromAssembly(typeof(EnrollStudentValidator).Assembly);
@@ -132,9 +135,27 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 // Register our training scheme mock services
-builder.Services
-    .AddAuthentication("Training")
-    .AddScheme<AuthenticationSchemeOptions, TrainingAuthHandler>("Training", null);
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme =
+    JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme =
+    JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+    Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+    };
+});
 builder.Services.AddAuthorization();
 
 builder.Services.AddDbContext<TmsDbContext>(options =>
