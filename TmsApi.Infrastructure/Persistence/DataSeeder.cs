@@ -1,6 +1,7 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-// using TmsApi.Data;
 using TmsApi.Domain.Entities;
+using TmsApi.Infrastructure.Identity;
 
 namespace TmsApi.Infrastructure.Persistence;
 
@@ -35,25 +36,108 @@ public static class DataSeeder
         ("UX-201", "Design Systems and Tokens", 22)
     ];
 
-    public static async Task SeedAsync(TmsDbContext db, CancellationToken ct = default)
+    public static async Task SeedAsync(
+        TmsDbContext db,
+        UserManager<TmsUser>? userManager = null,
+        RoleManager<IdentityRole>? roleManager = null,
+        CancellationToken ct = default)
     {
         await db.Database.MigrateAsync(ct);
 
-        if (await db.Courses.AnyAsync(ct))
+        // 1. Seed Roles
+        if (roleManager != null)
         {
-            return;
-        }
-
-        foreach (var (code, title, maxCapacity) in Courses)
-        {
-            db.Courses.Add(new Course
+            string[] roles = ["Admin", "Instructor", "Student"];
+            foreach (var role in roles)
             {
-                Code = code,
-                Title = title,
-                MaxCapacity = maxCapacity
-            });
+                if (!await roleManager.RoleExistsAsync(role))
+                {
+                    await roleManager.CreateAsync(new IdentityRole(role));
+                }
+            }
         }
 
-        await db.SaveChangesAsync(ct);
+        // 2. Seed Identity Users
+        string? instructor1Id = null;
+        string? instructor2Id = null;
+
+        if (userManager != null)
+        {
+            var seedUsers = new[]
+            {
+                ("admin@tms.com", "Admin", "User", "Admin"),
+                ("instructor1@tms.com", "Alice", "Instructor", "Instructor"),
+                ("instructor2@tms.com", "Bob", "Instructor", "Instructor"),
+                ("student@tms.com", "Charlie", "Student", "Student")
+            };
+
+            foreach (var (email, firstName, lastName, role) in seedUsers)
+            {
+                var existingUser = await userManager.FindByEmailAsync(email);
+                if (existingUser == null)
+                {
+                    var user = new TmsUser
+                    {
+                        UserName = email,
+                        Email = email,
+                        FirstName = firstName,
+                        LastName = lastName,
+                        EmailConfirmed = true
+                    };
+
+                    var result = await userManager.CreateAsync(user, "Password123!@");
+                    if (result.Succeeded)
+                    {
+                        await userManager.AddToRoleAsync(user, role);
+                        if (email == "instructor1@tms.com") instructor1Id = user.Id;
+                        if (email == "instructor2@tms.com") instructor2Id = user.Id;
+                    }
+                }
+                else
+                {
+                    if (email == "instructor1@tms.com") instructor1Id = existingUser.Id;
+                    if (email == "instructor2@tms.com") instructor2Id = existingUser.Id;
+                }
+            }
+        }
+
+        // 3. Seed Courses if not present
+        if (!await db.Courses.AnyAsync(ct))
+        {
+            foreach (var (code, title, maxCapacity) in Courses)
+            {
+                var course = new Course
+                {
+                    Code = code,
+                    Title = title,
+                    MaxCapacity = maxCapacity
+                };
+
+                // Assign ownership for resource policy demo
+                if (code == "CSE-101") course.InstructorId = instructor1Id;
+                if (code == "CSE-102") course.InstructorId = instructor2Id;
+
+                db.Courses.Add(course);
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        else
+        {
+            // Ensure first courses have assigned instructor IDs for testing
+            var course1 = await db.Courses.FirstOrDefaultAsync(c => c.Code == "CSE-101" || c.Code == "CS-101", ct);
+            if (course1 != null && string.IsNullOrEmpty(course1.InstructorId) && instructor1Id != null)
+            {
+                course1.InstructorId = instructor1Id;
+            }
+
+            var course2 = await db.Courses.FirstOrDefaultAsync(c => c.Code == "CSE-102" || c.Code == "CS-201", ct);
+            if (course2 != null && string.IsNullOrEmpty(course2.InstructorId) && instructor2Id != null)
+            {
+                course2.InstructorId = instructor2Id;
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
     }
 }

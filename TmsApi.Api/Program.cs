@@ -12,6 +12,7 @@ using Asp.Versioning;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using TmsApi.Infrastructure.Persistence;
 using TmsApi.Domain.Entities;
 using TmsApi.Application.Behaviors;
@@ -26,6 +27,10 @@ using TmsApi.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Tms.Api.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -156,10 +161,27 @@ builder.Services.AddAuthentication(options =>
     Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
     };
 });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanEditCourse", policy =>
+        policy.Requirements.Add(new CourseInstructorRequirement()));
+builder.Services.AddSingleton<IAuthorizationHandler, CourseInstructorHandler>();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("AuthLimiter", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+});
 
 builder.Services.AddDbContext<TmsDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase")).LogTo(Console.WriteLine, LogLevel.Information).EnableSensitiveDataLogging()
+    options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase"))
+           .LogTo(Console.WriteLine, LogLevel.Information)
+           .EnableSensitiveDataLogging()
+           .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
 );
 
 // Session 3: transcripts background processing + SignalR
@@ -174,6 +196,18 @@ builder.Services.AddHostedService<TranscriptWorker>();
 builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptNotificationService>();
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/scalar") && !context.Request.Path.StartsWithSegments("/openapi"))
+    {
+        context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        context.Response.Headers.Append("X-Frame-Options", "DENY");
+        context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';");
+    }
+    await next();
+});
 
 app.UseStatusCodePages();
 
@@ -199,9 +233,11 @@ else
 
 app.UseHttpsRedirection();
 
+app.UseRouting();
+
 app.UseCors("TmsClient");
 
-app.UseRouting();
+app.UseRateLimiter();
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 
@@ -300,7 +336,9 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-    await DataSeeder.SeedAsync(context);
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<TmsUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await DataSeeder.SeedAsync(context, userManager, roleManager);
 }
 
 app.Run();

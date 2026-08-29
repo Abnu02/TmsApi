@@ -3,14 +3,17 @@ using Microsoft.AspNetCore.Routing;
 using TmsApi.Application.Interfaces;
 using TmsApi.Application.DTOs;
 using TmsApi.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
+using TmsApi.Infrastructure.Persistence;
 
 namespace TmsApi.Api.Controllers;
-
+[Authorize(Roles = "Instructor,Admin")]
 [ApiController]
 [Route("api/courses")]
 [Tags("Courses")]
 [Produces("application/json")]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+
 public class CoursesController(ICourseService courseService, LinkGenerator linkGenerator) : ControllerBase
 {
     // [HttpGet]
@@ -97,28 +100,36 @@ public class CoursesController(ICourseService courseService, LinkGenerator linkG
         return CreatedAtAction(nameof(GetCourseById), new { id = created.Id }, created);
     }
 
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [EndpointSummary("Update a course")]
+    public async Task<IActionResult> UpdateCourse(
+        int id,
+        [FromBody] UpdateCourseRequest request,
+        [FromServices] IAuthorizationService authorizationService,
+        [FromServices] TmsDbContext context,
+        CancellationToken ct)
+    {
+        var course = await context.Courses.FindAsync(new object[] { id }, ct);
+        if (course == null) return NotFound();
 
+        var authResult = await authorizationService.AuthorizeAsync(User, course, "CanEditCourse");
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-    // [HttpPut("{code}")]
-    // public async Task<IActionResult> Update(int code, [FromBody] UpdateCourseRequest request, CancellationToken ct)
-    // {
-    //     var course = new Course
-    //     {
-    //         Code = code,
-    //         Title = request.Title,
-    //         MaxCapacity = request.MaxCapacity
-    //     };
+        course.Title = request.Title;
+        if (request.MaxCapacity > 0)
+        {
+            course.MaxCapacity = request.MaxCapacity;
+        }
 
-    //     var updated = await courseService.UpdateAsync(code, course);
-    //     return updated ? NoContent() : NotFound();
-    // }
-
-    // [HttpDelete("{code}")]
-    // public async Task<IActionResult> Delete(string code)
-    // {
-    //     var deleted = await courseService.DeleteAsync(code);
-    //     return deleted ? NoContent() : NotFound();
-    // }
+        await context.SaveChangesAsync(ct);
+        return NoContent();
+    }
 }
 
 // public record CreateCourseRequest(string Code, string Title, int MaxCapacity);
